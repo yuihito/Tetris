@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class Tetromino : MonoBehaviour
 {
-    public float fallDelay = 1.0f; // 自然落下の間隔
+    public float fallDelay = 1.0f;
     private float fallTimer;
 
     void Update()
@@ -11,65 +11,84 @@ public class Tetromino : MonoBehaviour
         HandleAutoFall();
     }
 
-    // 入力処理
     private void HandleInput()
     {
-        // 左移動 (Aキー)
-        if (Input.GetKeyDown(KeyCode.A))
-        {
-            transform.position += Vector3.left;
-        }
+        if (Input.GetKeyDown(KeyCode.A)) TryMove(Vector3.left);
+        if (Input.GetKeyDown(KeyCode.D)) TryMove(Vector3.right);
 
-        // 右移動 (Dキー)
-        if (Input.GetKeyDown(KeyCode.D))
-        {
-            transform.position += Vector3.right;
-        }
+        if (Input.GetKey(KeyCode.S)) TryMove(Vector3.down);
 
-        // ソフトドロップ (Sキー)
-        if (Input.GetKey(KeyCode.S))
-        {
-            transform.position += Vector3.down * Time.deltaTime * 5f;
-        }
+        if (Input.GetKeyDown(KeyCode.W)) HardDrop();
 
-        // ハードドロップ (Wキー)
-        if (Input.GetKeyDown(KeyCode.W))
-        {
-            while (true) // 下に行けなくなるまで落とす予定（今は仮）
-            {
-                transform.position += Vector3.down;
-                // TODO: 当たり判定を後で追加
-                if (transform.position.y < -10) break;
-            }
-        }
+        if (Input.GetKeyDown(KeyCode.L)) transform.Rotate(0, 0, 90);
+        if (Input.GetKeyDown(KeyCode.P)) transform.Rotate(0, 0, -90);
 
-        // 左回転 (Lキー)
-        if (Input.GetKeyDown(KeyCode.L))
-        {
-            transform.Rotate(0, 0, 90);
-        }
-
-        // 右回転 (Pキー)
-        if (Input.GetKeyDown(KeyCode.P))
-        {
-            transform.Rotate(0, 0, -90);
-        }
-
-        // ホールド (Shiftキー)
         if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
         {
             Debug.Log("Hold feature (未実装)");
         }
     }
 
-    // 自然落下処理
     private void HandleAutoFall()
     {
         fallTimer += Time.deltaTime;
         if (fallTimer >= fallDelay)
         {
-            transform.position += Vector3.down;
+            TryMove(Vector3.down);
             fallTimer = 0;
         }
+    }
+
+    // 動かす処理
+    private void TryMove(Vector3 direction)
+    {
+        transform.position += direction;
+
+        if (!IsValidPosition())
+        {
+            transform.position -= direction;
+
+            // 下に動けないとき → グリッドに固定
+            if (direction == Vector3.down)
+            {
+                Game.Instance.AddToGrid(transform);
+                enabled = false; // このミノの操作を無効化
+                Game.Instance.SpawnNextTetromino(); // 次を生成
+            }
+        }
+    }
+
+    // ハードドロップ
+    private void HardDrop()
+    {
+        while (true)
+        {
+            transform.position += Vector3.down;
+            if (!IsValidPosition())
+            {
+                transform.position -= Vector3.down;
+                Game.Instance.AddToGrid(transform);
+                enabled = false;
+                Game.Instance.SpawnNextTetromino();
+                break;
+            }
+        }
+    }
+
+    // 有効な位置か確認
+    private bool IsValidPosition()
+    {
+        foreach (Transform block in transform)
+        {
+            Vector2 pos = Game.Instance.Round(block.position);
+
+            if (!Game.Instance.IsInsideGrid(pos))
+                return false;
+
+            if (Game.Instance.grid[(int)pos.x, (int)pos.y] != null &&
+                Game.Instance.grid[(int)pos.x, (int)pos.y].parent != transform)
+                return false;
+        }
+        return true;
     }
 }
